@@ -204,3 +204,10 @@ This project demonstrates a basic implementation. MST offers many more advanced 
 ## Conclusion
 
 This Todo application demonstrates a clean implementation of MobX-State-Tree in a React Native application. It shows how MST makes state management simple, type-safe, and performant even in a small application. The same patterns shown here can be scaled to larger, more complex applications with minimal additional complexity.
+
+## References
+
+- [MobX Official Documentation](https://mobx.js.org/) - The official MobX documentation provides comprehensive guides, API references, and examples for using MobX in your applications.
+
+- [MobX-State-Tree Documentation](https://mobx-state-tree.js.org/) - The official MST documentation contains detailed guides, tutorials, and API references for building robust state management with MobX-State-Tree.
+
