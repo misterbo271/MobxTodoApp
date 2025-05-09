@@ -2,6 +2,19 @@
 
 This document provides an overview of how MobX and MobX-State-Tree (MST) are implemented and utilized in this React Native Todo application.
 
+## App Screenshot
+
+Below is a screenshot of the Todo application in action:
+
+<img src="./src/assets/images/screenshot-1.png" alt="Todo App Screenshot" width="200" />
+
+The application features:
+- A clean blue header with the title "Todo List"
+- An input field for adding new tasks
+- A list of todo items with checkboxes
+- Completed items showing with a strikethrough and delete button
+- A responsive design that works well on mobile devices
+
 ## Project Environment
 
 - **React Native Version**: 0.79.2
@@ -253,6 +266,28 @@ Key points:
 - Loading state handling with `ActivityIndicator` during data loading
 - Direct destructuring of store methods and properties
 - Deletion functionality for completed todos
+
+## UI Implementation
+
+As shown in the screenshot, the application features:
+
+1. **Header**: A prominent blue header with "Todo List" in white text
+2. **Input Area**: A clean input field with placeholder text and an ADD button
+3. **Todo Items**: Each todo item has:
+   - A checkbox that can be toggled (square for incomplete, checked for complete)
+   - The task text (with strikethrough for completed items)
+   - A delete button (trash icon) that appears for completed items
+4. **Visual Feedback**: 
+   - Completed items show with a strikethrough text style
+   - Blue accent color for interactive elements
+   - Light background for better readability
+
+This UI design follows React Native best practices with:
+- Component-based architecture
+- StyleSheet usage for styling
+- Responsive layout that adapts to different screen sizes
+- Proper use of icons from react-native-vector-icons
+- Touch feedback for all interactive elements
 
 ## Data Persistence
 
