@@ -48,54 +48,105 @@ The project uses a simple but effective model structure:
 #### 1. Todo Model (`src/models/Todo.js`)
 
 ```javascript
-import { types } from 'mobx-state-tree';
+import { types, getParent } from 'mobx-state-tree';
 
 export const Todo = types
   .model("Todo", {
-    id: types.number,
+    id: types.string,
     title: types.string,
     done: types.boolean,
   })
   .actions((self) => ({
     toggle() {
       self.done = !self.done;
+      // Get parent store and save todos after toggle
+      getParent(self, 2).saveTodos();
     },
   }));
 ```
 
 This model represents a single todo item with:
-- Properties: `id`, `title`, and `done` status
+- Properties: `id` (string), `title`, and `done` status
 - Actions: `toggle()` to change the completion status
+- Parent communication: Uses `getParent()` to access the root store and trigger data persistence
 
 #### 2. RootStore (`src/models/RootStore.js`)
 
 ```javascript
-import { types } from 'mobx-state-tree';
+import { types, flow, onSnapshot, getSnapshot } from 'mobx-state-tree';
 import { Todo } from './Todo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const STORAGE_KEY = 'MOBX_TODO_APP_DATA';
 
 export const RootStore = types
   .model('RootStore', {
     todos: types.array(Todo),
+    isLoading: types.optional(types.boolean, false),
   })
-  .actions((self) => ({
-    addTodo(title) {
-      self.todos.push({ id: self.todos.length + 1, title, done: false });
+  .views((self) => ({
+    get completedCount() {
+      return self.todos.filter(todo => todo.done).length;
     },
-  }));
-
-export const createRootStore = () => {
-  return RootStore.create({
-    todos: [],
+    get remainingCount() {
+      return self.todos.length - self.completedCount;
+    }
+  }))
+  .actions((self) => {
+    const afterCreate = () => {
+      self.loadTodos();
+    };
+    
+    return {
+      afterCreate,
+      addTodo(title) {
+        const id = Date.now().toString();
+        self.todos.push({ id, title, done: false });
+        self.saveTodos();
+      },
+      
+      deleteTodo(id) {
+        const index = self.todos.findIndex(todo => todo.id === id);
+        if (index !== -1) {
+          self.todos.splice(index, 1);
+          self.saveTodos();
+        }
+      },
+      
+      saveTodos: flow(function* saveTodos() {
+        try {
+          const todosData = JSON.stringify(getSnapshot(self.todos));
+          yield AsyncStorage.setItem(STORAGE_KEY, todosData);
+        } catch (error) {
+          console.error('Error saving todos:', error);
+        }
+      }),
+      
+      loadTodos: flow(function* loadTodos() {
+        self.isLoading = true;
+        try {
+          const data = yield AsyncStorage.getItem(STORAGE_KEY);
+          if (data) {
+            const todosData = JSON.parse(data);
+            self.todos.replace(todosData);
+          }
+        } catch (error) {
+          console.error('Error loading todos:', error);
+        } finally {
+          self.isLoading = false;
+        }
+      }),
+    };
   });
-};
-
-export const rootStore = createRootStore();
 ```
 
 The RootStore:
 - Composes the Todo model in an array
-- Provides an action to add new todo items
-- Creates an initial store with an empty todos array
+- Provides lifecycle hooks via `afterCreate`
+- Handles data persistence with AsyncStorage
+- Includes computed views for completed and remaining counts
+- Provides actions for adding, deleting, saving and loading todos
+- Uses flow generators for handling async operations
 
 ### Store Context Setup
 
@@ -148,23 +199,70 @@ The App component simply wraps the HomeScreen with the RootStoreProvider, making
 #### HomeScreen Component (`src/screens/HomeScreen.js`)
 
 ```javascript
-import React, { useState } from 'react';
-import { /* ...imports */ } from 'react-native';
-import { observer } from 'mobx-react-lite';
-import { rootStore } from '../models/RootStore';
+// Separate observer component for optimal reactivity
+const TodoItem = observer(({ item, onToggle, onDelete }) => {
+  return (
+    <TouchableOpacity 
+      onPress={onToggle}
+      style={styles.todoItem}
+    >
+      <View style={styles.todoContent}>
+        <View style={styles.checkboxContainer}>
+          {item.done ? (
+            <Icon name="check-box" size={24} color="#4287f5" />
+          ) : (
+            <Icon name="check-box-outline-blank" size={24} color="#4287f5" />
+          )}
+        </View>
+        <Text style={[styles.todoTitle, item.done && styles.todoTitleDone]}>
+          {item.title}
+        </Text>
+        {item.done && (
+          <TouchableOpacity onPress={onDelete} style={styles.deleteButton}>
+            <Icon name="delete" size={22} color="#ff6b6b" />
+          </TouchableOpacity>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 export const HomeScreen = observer(() => {
   const [text, setText] = useState('');
-  const { todos, addTodo } = rootStore;
+  const { todos, addTodo, deleteTodo, isLoading } = rootStore;
+  const [refresh, setRefresh] = useState(false);
 
-  // UI implementation...
+  // Load todos on component mount
+  useEffect(() => {
+    rootStore.loadTodos();
+  }, []);
+
+  const handleToggle = (item) => {
+    item.toggle();
+    setRefresh(!refresh);
+  };
+
+  // Render loading state or todo list
+  // ...
 });
 ```
 
 Key points:
-- The component is wrapped with the `observer` HOC from mobx-react-lite, which automatically re-renders when observed data changes
-- It accesses the store directly via the rootStore import
-- It destructures todos and addTodo from the store
+- Separate `TodoItem` component for better reactivity and rendering optimization
+- Force re-rendering with the `refresh` state and `extraData` prop for the FlatList
+- Loading state handling with `ActivityIndicator` during data loading
+- Direct destructuring of store methods and properties
+- Deletion functionality for completed todos
+
+## Data Persistence
+
+This application implements data persistence using AsyncStorage:
+
+1. **Storage Key**: A constant `STORAGE_KEY` is used to store and retrieve data
+2. **Auto-Loading**: Data is loaded automatically when the store is created via the `afterCreate` lifecycle hook
+3. **On-Change Saving**: Data is saved whenever a todo is added, toggled, or deleted
+4. **Snapshots**: The MST `getSnapshot` function is used to serialize the state tree
+5. **Error Handling**: Try/catch blocks around async operations ensure robust data handling
 
 ## Benefits of MST in this Project
 
@@ -173,6 +271,7 @@ Key points:
 3. **Simple API**: Observable state that auto-updates the UI
 4. **Predictable State Changes**: State can only be modified through actions
 5. **Performance**: Selective re-rendering only when needed
+6. **Persistence**: Seamless integration with AsyncStorage for data persistence
 
 ## How Reactivity Works in this App
 
@@ -180,7 +279,20 @@ Key points:
 2. When a new Todo is added via `addTodo()`, MST tracks this change
 3. The HomeScreen component observes this data via the `observer` wrapper
 4. React automatically re-renders the FlatList when the todos array changes
-5. Similarly, when `toggle()` is called on a Todo, only that specific Todo item re-renders
+5. The TodoItem component is an observer itself, so it only re-renders when its specific props change
+6. When `toggle()` is called on a Todo, the UI updates to reflect the new state
+7. For completed todos, a delete button appears, allowing the user to remove the item
+
+## MST Features Used in This Project
+
+1. **Models**: Structured data with the `types.model()` function
+2. **Actions**: Methods that modify state with the `.actions()` function
+3. **Views**: Computed values with the `.views()` function
+4. **Flow Generators**: Async actions with the `flow()` function
+5. **Lifecycles**: React to model creation with `afterCreate`
+6. **Snapshots**: Serialize state with `getSnapshot()`
+7. **Observers**: React components that react to state changes with `observer()`
+8. **Parent References**: Access parent models with `getParent()`
 
 ## Best Practices Used
 
@@ -189,21 +301,24 @@ Key points:
 3. **Contained Logic**: Business logic (toggling, adding) is contained in the models
 4. **Component Decoupling**: UI components don't need to know the details of state management
 5. **React Context Integration**: Proper use of Context API to avoid prop drilling
+6. **Data Persistence**: Automatic saving and loading of data for offline use
+7. **Optimized Rendering**: Using separate observer components to minimize re-renders
 
 ## Advanced MST Features Not Used (But Available)
 
 This project demonstrates a basic implementation. MST offers many more advanced features not utilized here:
 
-1. **Views (computed)**: Derived values from state
-2. **Middleware**: Intercept actions, state changes
-3. **References**: Create references between models
-4. **Snapshots & Patches**: For time-travel debugging
-5. **Lifecycle Hooks**: React to model events
-6. **Volatile State**: For transient UI state
+1. **Advanced Views**: More complex computed values with arguments or memoization
+2. **Middleware**: Intercept actions, state changes for logging or debugging
+3. **References**: Create references between models with `types.reference`
+4. **Identifiers**: More advanced use of `types.identifier` for model relationships
+5. **Patches**: For time-travel debugging and undo/redo functionality
+6. **Volatile State**: For transient UI state that doesn't need to be serialized
+7. **Custom Types**: Create your own types with custom validation logic
 
 ## Conclusion
 
-This Todo application demonstrates a clean implementation of MobX-State-Tree in a React Native application. It shows how MST makes state management simple, type-safe, and performant even in a small application. The same patterns shown here can be scaled to larger, more complex applications with minimal additional complexity.
+This Todo application demonstrates a clean implementation of MobX-State-Tree in a React Native application. It shows how MST makes state management simple, type-safe, and performant even in a small application. The addition of data persistence with AsyncStorage enhances the user experience by preserving todos between app sessions. The same patterns shown here can be scaled to larger, more complex applications with minimal additional complexity.
 
 ## References
 
