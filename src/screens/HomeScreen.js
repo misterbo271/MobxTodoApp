@@ -1,24 +1,76 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, Button, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, Button, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ActivityIndicator } from 'react-native';
 import { observer } from 'mobx-react-lite';
 import { rootStore } from '../models/RootStore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
+const TodoItem = observer(({ item, onToggle, onDelete }) => {
+  return (
+    <TouchableOpacity
+      onPress={onToggle}
+      style={styles.todoItem}
+    >
+      <View style={styles.todoContent}>
+        <View style={styles.checkboxContainer}>
+          {item.done ? (
+            <Icon name="check-box" size={24} color="#4287f5" />
+          ) : (
+            <Icon name="check-box-outline-blank" size={24} color="#4287f5" />
+          )}
+        </View>
+        <Text style={[
+          styles.todoTitle,
+          item.done && styles.todoTitleDone
+        ]}>
+          {item.title}
+        </Text>
+        {item.done && (
+          <TouchableOpacity
+            onPress={onDelete}
+            style={styles.deleteButton}
+          >
+            <Icon name="delete" size={22} color="#ff6b6b" />
+          </TouchableOpacity>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 export const HomeScreen = observer(() => {
   const [text, setText] = useState('');
-  const { todos, addTodo } = rootStore;
-  console.log(todos);
+  const { todos, addTodo, deleteTodo, isLoading } = rootStore;
+  const [refresh, setRefresh] = useState(false); // Add state for forcing re-render
+
+  useEffect(() => {
+    rootStore.loadTodos();
+  }, []);
+
+  const handleToggle = (item) => {
+    item.toggle();
+    setRefresh(!refresh);
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#4287f5" />
+        <Text style={styles.loadingText}>Loading your todos...</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#4287f5" barStyle="dark-content" />
       <View style={styles.header}>
         <Text style={styles.headerText}>Todo List</Text>
       </View>
-      
+
       <View style={styles.inputContainer}>
         <TextInput
           placeholder="Enter a new task..."
-          placeholderTextColor="#6f9ade"
+          placeholderTextColor="#56a8db"
           value={text}
           onChangeText={setText}
           style={styles.input}
@@ -35,33 +87,19 @@ export const HomeScreen = observer(() => {
           <Text style={styles.addButtonText}>ADD</Text>
         </TouchableOpacity>
       </View>
-      
+
       <FlatList
         data={todos.slice()}
+        extraData={refresh}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
-          <TouchableOpacity 
-            onPress={() => item.toggle()}
-            style={styles.todoItem}
-          >
-            <View style={styles.todoContent}>
-              <View style={styles.checkboxContainer}>
-                {item.done ? (
-                  <Icon name="check-box" size={24} color="#4287f5" />
-                ) : (
-                  <Icon name="check-box-outline-blank" size={24} color="#4287f5" />
-                )}
-              </View>
-              <Text style={[
-                styles.todoTitle, 
-                item.done && styles.todoTitleDone
-              ]}>
-                {item.title}
-              </Text>
-            </View>
-          </TouchableOpacity>
+          <TodoItem
+            item={item}
+            onToggle={() => handleToggle(item)}
+            onDelete={() => deleteTodo(item.id)}
+          />
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -77,6 +115,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#e6eefc',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#4287f5',
   },
   header: {
     padding: 16,
@@ -166,6 +213,9 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
     color: '#999',
   },
+  deleteButton: {
+    padding: 5,
+  },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -173,7 +223,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#6f9ade',
+    color: '#56a8db',
     textAlign: 'center',
   },
 });
