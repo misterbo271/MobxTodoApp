@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Button, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
 import { observer } from 'mobx-react-lite';
 import { rootStore } from '../models/RootStore';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 export const HomeScreen = observer(() => {
   const [text, setText] = useState('');
   const { todos, addTodo } = rootStore;
-
+  console.log(todos);
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#4287f5" barStyle="dark-content" />
@@ -17,7 +18,7 @@ export const HomeScreen = observer(() => {
       <View style={styles.inputContainer}>
         <TextInput
           placeholder="Enter a new task..."
-          placeholderTextColor="#88c2b5"
+          placeholderTextColor="#6f9ade"
           value={text}
           onChangeText={setText}
           style={styles.input}
@@ -46,9 +47,13 @@ export const HomeScreen = observer(() => {
             style={styles.todoItem}
           >
             <View style={styles.todoContent}>
-              <Text style={styles.todoCheckbox}>
-                {item.done ? "✅" : "⬜️"}
-              </Text>
+              <View style={styles.checkboxContainer}>
+                {item.done ? (
+                  <Icon name="check-box" size={24} color="#4287f5" />
+                ) : (
+                  <Icon name="check-box-outline-blank" size={24} color="#4287f5" />
+                )}
+              </View>
               <Text style={[
                 styles.todoTitle, 
                 item.done && styles.todoTitleDone
@@ -147,9 +152,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 15,
   },
-  todoCheckbox: {
-    fontSize: 22,
+  checkboxContainer: {
     marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   todoTitle: {
     fontSize: 17,
@@ -167,7 +173,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#88c2b5',
+    color: '#6f9ade',
     textAlign: 'center',
   },
 });
